@@ -1,8 +1,5 @@
 #version 450
 
-#define WORKGROUP_SIZE 256 
-shared vec4 sharedPosMass[WORKGROUP_SIZE];
-
 // Define the number of threads per workgroup (e.g., 256 particles per group)
 layout(local_size_x = 256, local_size_y = 1, local_size_z = 1) in;
 
@@ -10,4 +7,46 @@ layout(push_constant) uniform PushConstants {
     float deltaTime;
     uint gridWidth;
     uint gridHeight;
+} push;
+
+struct Particle {
+    vec4 position_pinned; 
+    vec4 velocity;      
 };
+
+// Binding 0: Read from Frame n
+layout(std430, binding = 0) readonly buffer ParticlesIn {
+    Particle particlesIn[];
+};
+
+// Binding 1: Write to Frame n+1
+layout(std430, binding = 1) buffer ParticlesOut {
+    Particle particlesOut[];
+};
+
+void main()
+{
+    uint i = gl_GlobalInvocationID.x;
+    uint totalParticles = push.gridWidth * push.gridHeight;
+
+    // Bounds check — extra threads beyond particle count do nothing
+    if (i >= totalParticles) return;
+
+    vec4 p_pin = particlesIn[i].position_pinned; 
+    vec3 pos = p_pin.xyz;
+    float pinned = p_pin.w;
+    vec3 vel = particlesIn[i].velocity.xyz;
+
+    // Pinned particles are written back unchanged and exit early
+    if (pinned == 1.0)
+    {
+        particlesOut[i] = particlesIn[i];
+        return; 
+    }
+
+    vel += vec3(0.0, -9.8, 0.0) * push.deltaTime;
+    pos += vel * push.deltaTime;
+
+    particlesOut[i].position_pinned = vec4(pos, pinned);
+    particlesOut[i].velocity = vec4(vel, 0.0);
+}

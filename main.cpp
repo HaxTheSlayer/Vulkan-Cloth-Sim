@@ -13,7 +13,7 @@
 #include <iostream>
 #include <chrono>
 
-glm::vec3 cameraPos = glm::vec3(0.0f, 0.5f, 4.0f);
+glm::vec3 cameraPos = glm::vec3(0.0f, 0.0f, 8.0f);
 glm::vec3 cameraFront = glm::vec3(0.0f, 0.0f, -1.0f);
 glm::vec3 cameraUp = glm::vec3(0.0f, 1.0f, 0.0f);
 
@@ -55,6 +55,7 @@ void mouse_callback(GLFWwindow* window, double xposIn, double yposIn) {
     front.z = sin(glm::radians(yaw)) * cos(glm::radians(pitch));
     cameraFront = glm::normalize(front);
 }
+
 
 int main() {
     try {
@@ -114,7 +115,7 @@ int main() {
             cmdBuffer.begin({});
 
             //Execute Physics (Compute Pass)
-            //solver.dispatchCompute(cmdBuffer, deltaTime);
+            solver.dispatchCompute(cmdBuffer, deltaTime);
 
             // Prepare for Drawing (Image Transition)
             vk::ImageMemoryBarrier barrier2(

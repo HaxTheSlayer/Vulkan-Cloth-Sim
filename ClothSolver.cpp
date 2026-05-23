@@ -11,7 +11,7 @@ ClothSolver::ClothSolver(VulkanContext& context, uint32_t w, uint32_t h)
 
     createStorageBuffers();
     createDescriptorSets();
-    //createComputePipeline();
+    createComputePipeline();
 }
 
 void ClothSolver::createStorageBuffers() {
