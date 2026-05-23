@@ -7,6 +7,8 @@ layout(push_constant) uniform PushConstants {
     float deltaTime;
     uint gridWidth;
     uint gridHeight;
+    float k;
+    float rest_length;
 } push;
 
 struct Particle {
@@ -32,6 +34,9 @@ void main()
     // Bounds check — extra threads beyond particle count do nothing
     if (i >= totalParticles) return;
 
+    uint gridX = i % push.gridWidth;
+    uint gridY = i / push.gridWidth;
+
     vec4 p_pin = particlesIn[i].position_pinned; 
     vec3 pos = p_pin.xyz;
     float pinned = p_pin.w;
@@ -44,8 +49,81 @@ void main()
         return; 
     }
 
-    vel += vec3(0.0, -9.8, 0.0) * push.deltaTime;
+    vec3 totalForce = vec3(0.0);
+
+    // Left neighbor
+    if (gridX > 0) { // Only do this if we are not on the left edge
+        vec3 leftPos = particlesIn[i - 1].position_pinned.xyz;
+        vec3 delta = leftPos - pos;           
+        float dist = length(delta);           
+        
+        if (dist > 0.0001) {                  
+            vec3 dir = normalize(delta);      
+            
+            // F = k * (current_distance - rest_distance) * direction
+            vec3 force = push.k * (dist - push.rest_length) * dir;
+            totalForce += force;
+        }
+    }
+
+    //  Right neighbor
+    if (gridX < push.gridWidth - 1) { // Only if not on the right edge
+        vec3 rightPos = particlesIn[i + 1].position_pinned.xyz;
+        vec3 delta = rightPos - pos;
+        float dist = length(delta);
+        
+        if (dist > 0.0001) {
+            vec3 dir = normalize(delta);
+            vec3 force = push.k * (dist - push.rest_length) * dir;
+            totalForce += force;
+        }
+    }
+
+    // Above neighbor
+    if (gridY > 0) { // Only do this if we are not on the top edge
+        vec3 leftPos = particlesIn[i - push.gridWidth].position_pinned.xyz;
+        vec3 delta = leftPos - pos;           
+        float dist = length(delta);           
+        
+        if (dist > 0.0001) {                  
+            vec3 dir = normalize(delta);      
+            
+            // F = k * (current_distance - rest_distance) * direction
+            vec3 force = push.k * (dist - push.rest_length) * dir;
+            totalForce += force;
+        }
+    }
+
+    //  Below neighbor
+    if (gridY < push.gridHeight - 1) { // Only if not on the right edge
+        vec3 rightPos = particlesIn[i + push.gridWidth].position_pinned.xyz;
+        vec3 delta = rightPos - pos;
+        float dist = length(delta);
+        
+        if (dist > 0.0001) {
+            vec3 dir = normalize(delta);
+            vec3 force = push.k * (dist - push.rest_length) * dir;
+            totalForce += force;
+        }
+    }
+
+    totalForce += vec3(0.0, -9.8, 0.0); 
+
+    // Apply forces to velocity (assuming mass = 1.0)
+    vel += totalForce * push.deltaTime;
+    vel *= 0.999; // Slight friction/damping to prevent explosive oscillation
     pos += vel * push.deltaTime;
+
+    float floorHeight = -3.0;
+    if (pos.y < floorHeight) {
+        pos.y = floorHeight; // Clamp to floor
+        
+        // Kill downward velocity and apply friction to X/Z movement
+        vel.y = 0.0;
+        vel.x *= 0.8; // Friction sliding along the X axis
+        vel.z *= 0.8; // Friction sliding along the Z axis
+        
+    }
 
     particlesOut[i].position_pinned = vec4(pos, pinned);
     particlesOut[i].velocity = vec4(vel, 0.0);

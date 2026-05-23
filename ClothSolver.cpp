@@ -5,8 +5,8 @@
 #include <random>
 #include <numbers>
 
-ClothSolver::ClothSolver(VulkanContext& context, uint32_t w, uint32_t h)
-    : vkContext(context), gridWidth(w), gridHeight(h), particleCount(w* h)
+ClothSolver::ClothSolver(VulkanContext& context, uint32_t w, uint32_t h, float spacing, float k)
+    : vkContext(context), gridWidth(w), gridHeight(h), particleCount(w * h), spacing(spacing), springStiffness(k)
 {
 
     createStorageBuffers();
@@ -16,8 +16,6 @@ ClothSolver::ClothSolver(VulkanContext& context, uint32_t w, uint32_t h)
 
 void ClothSolver::createStorageBuffers() {
     std::vector<ParticleData> initialParticles(particleCount);
-
-    float spacing = 0.1f;  // world-space distance between particles
 
     for (uint32_t y = 0; y < gridHeight; y++) {
         for (uint32_t x = 0; x < gridWidth; x++) {
@@ -201,7 +199,7 @@ void ClothSolver::createComputePipeline() {
     vk::PushConstantRange pushConstantRange(
         vk::ShaderStageFlagBits::eCompute,      // stageFlags
         0,                                      // offset
-        sizeof(float) + 2 * sizeof(uint32_t)        // size (12 bytes total)
+        sizeof(PushConstants)                   // size (20 bytes total)
     );
 
     // 2. Add the Push Constant to the Pipeline Layout
@@ -224,12 +222,8 @@ void ClothSolver::createComputePipeline() {
 }
 
 void ClothSolver::dispatchCompute(vk::raii::CommandBuffer& cmdBuffer, float deltaTime) {
-    // 1. Match the GLSL memory layout exactly (8 bytes total)
-    struct PushConstants {
-        float deltaTime;
-        uint32_t gridWidth;
-        uint32_t gridHeight;
-    } pushData{ deltaTime, gridWidth, gridHeight };
+
+    PushConstants pushData{ deltaTime, gridWidth, gridHeight, springStiffness, spacing };
 
     cmdBuffer.bindPipeline(vk::PipelineBindPoint::eCompute, *computePipeline);
 
@@ -242,7 +236,7 @@ void ClothSolver::dispatchCompute(vk::raii::CommandBuffer& cmdBuffer, float delt
         nullptr
     );
 
-    // Push the 8 bytes of constant data
+    // Push the 20 bytes of constant data
     cmdBuffer.pushConstants<PushConstants>(
         *computePipelineLayout,
         vk::ShaderStageFlagBits::eCompute,

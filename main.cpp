@@ -60,7 +60,7 @@ void mouse_callback(GLFWwindow* window, double xposIn, double yposIn) {
 int main() {
     try {
         VulkanContext context(800, 800);
-        ClothSolver solver(context, 32, 32);
+        ClothSolver solver(context, 32, 32, 0.1f, 500.0f);
         Renderer renderer(context, solver);
 
         // Capture the mouse cursor
