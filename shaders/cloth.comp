@@ -26,6 +26,17 @@ layout(std430, binding = 1) buffer ParticlesOut {
     Particle particlesOut[];
 };
 
+vec3 calculateSpringForce(vec3 pos, vec3 neighborPos, float restLength, float k) {
+    vec3 delta = neighborPos - pos;
+    float dist = length(delta);
+    
+    if (dist > 0.0001) { // Prevent division by zero
+        vec3 dir = normalize(delta);
+        return k * (dist - restLength) * dir;
+    }
+    return vec3(0.0);
+}
+
 void main()
 {
     uint i = gl_GlobalInvocationID.x;
@@ -50,68 +61,38 @@ void main()
     }
 
     vec3 totalForce = vec3(0.0);
+    float k = push.k;
+    float L = push.rest_length;
 
-    // Left neighbor
-    if (gridX > 0) { // Only do this if we are not on the left edge
-        vec3 leftPos = particlesIn[i - 1].position_pinned.xyz;
-        vec3 delta = leftPos - pos;           
-        float dist = length(delta);           
-        
-        if (dist > 0.0001) {                  
-            vec3 dir = normalize(delta);      
-            
-            // F = k * (current_distance - rest_distance) * direction
-            vec3 force = push.k * (dist - push.rest_length) * dir;
-            totalForce += force;
-        }
-    }
+    //Structural Springs (Rest Length = L)
+    if (gridX > 0) totalForce += calculateSpringForce(pos, particlesIn[i - 1].position_pinned.xyz, L, k); //Left Neighbour
+    if (gridX < push.gridWidth - 1) totalForce += calculateSpringForce(pos, particlesIn[i + 1].position_pinned.xyz, L, k); // Right Neighbour
+    if (gridY > 0) totalForce += calculateSpringForce(pos, particlesIn[i - push.gridWidth].position_pinned.xyz, L, k); //Above Neighbour
+    if (gridY < push.gridHeight - 1) totalForce += calculateSpringForce(pos, particlesIn[i + push.gridWidth].position_pinned.xyz, L, k); //Below Neighbour
 
-    //  Right neighbor
-    if (gridX < push.gridWidth - 1) { // Only if not on the right edge
-        vec3 rightPos = particlesIn[i + 1].position_pinned.xyz;
-        vec3 delta = rightPos - pos;
-        float dist = length(delta);
-        
-        if (dist > 0.0001) {
-            vec3 dir = normalize(delta);
-            vec3 force = push.k * (dist - push.rest_length) * dir;
-            totalForce += force;
-        }
-    }
+    //Bend Springs
+    float L_bend = L * 2.0;
+    if (gridX > 1) totalForce += calculateSpringForce(pos, particlesIn[i - 2].position_pinned.xyz, L_bend, k); // Second Left Neighbour
+    if (gridX < push.gridWidth - 2) totalForce += calculateSpringForce(pos, particlesIn[i + 2].position_pinned.xyz, L_bend, k); // Second Right Neighbour
+    if (gridY > 1) totalForce += calculateSpringForce(pos, particlesIn[i - 2 * push.gridWidth].position_pinned.xyz, L_bend, k); // Second Above Neighbour
+    if (gridY < push.gridHeight - 2) totalForce += calculateSpringForce(pos, particlesIn[i + 2 * push.gridWidth].position_pinned.xyz, L_bend, k); // Second Below Neighbour
 
-    // Above neighbor
-    if (gridY > 0) { // Only do this if we are not on the top edge
-        vec3 leftPos = particlesIn[i - push.gridWidth].position_pinned.xyz;
-        vec3 delta = leftPos - pos;           
-        float dist = length(delta);           
-        
-        if (dist > 0.0001) {                  
-            vec3 dir = normalize(delta);      
-            
-            // F = k * (current_distance - rest_distance) * direction
-            vec3 force = push.k * (dist - push.rest_length) * dir;
-            totalForce += force;
-        }
-    }
-
-    //  Below neighbor
-    if (gridY < push.gridHeight - 1) { // Only if not on the right edge
-        vec3 rightPos = particlesIn[i + push.gridWidth].position_pinned.xyz;
-        vec3 delta = rightPos - pos;
-        float dist = length(delta);
-        
-        if (dist > 0.0001) {
-            vec3 dir = normalize(delta);
-            vec3 force = push.k * (dist - push.rest_length) * dir;
-            totalForce += force;
-        }
-    }
+    //Shear Springs
+    float L_shear = L * sqrt(2);
+    if (gridX > 0 && gridY > 0) 
+        totalForce += calculateSpringForce(pos, particlesIn[i - push.gridWidth - 1].position_pinned.xyz, L_shear, k); //Top Left Neighbour
+    if (gridX < (push.gridWidth - 1) && gridY > 0) 
+        totalForce += calculateSpringForce(pos, particlesIn[i - push.gridWidth + 1].position_pinned.xyz, L_shear, k); //Top Right Neighbour
+    if (gridX > 0 && gridY < (push.gridHeight - 1)) 
+        totalForce += calculateSpringForce(pos, particlesIn[i + push.gridWidth - 1].position_pinned.xyz, L_shear, k); //Bottom Left Neighbour
+    if (gridX < (push.gridWidth - 1) && gridY < (push.gridHeight - 1)) 
+        totalForce += calculateSpringForce(pos, particlesIn[i + push.gridWidth + 1].position_pinned.xyz, L_shear, k); //Bottom Right Neighbour
 
     totalForce += vec3(0.0, -9.8, 0.0); 
 
     // Apply forces to velocity (assuming mass = 1.0)
     vel += totalForce * push.deltaTime;
-    vel *= 0.999; // Slight friction/damping to prevent explosive oscillation
+    vel *= 0.98; // Slight friction/damping to prevent explosive oscillation
     pos += vel * push.deltaTime;
 
     float floorHeight = -3.0;
@@ -120,8 +101,19 @@ void main()
         
         // Kill downward velocity and apply friction to X/Z movement
         vel.y = 0.0;
-        vel.x *= 0.8; // Friction sliding along the X axis
-        vel.z *= 0.8; // Friction sliding along the Z axis
+        
+        // To avoid cloth from slipping on the ground when velocity is very small
+        if (abs(vel.x) < 0.05) {
+            vel.x = 0.0;
+        } else {
+            vel.x *= 0.8;
+        }
+        
+        if (abs(vel.z) < 0.05) {
+            vel.z = 0.0;
+        } else {
+            vel.z *= 0.8;
+        }
         
     }
 
