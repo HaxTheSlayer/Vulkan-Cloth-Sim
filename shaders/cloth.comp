@@ -13,6 +13,15 @@ layout(push_constant) uniform PushConstants {
     float mouseY;
     float mouseZ;
     float isMouseDown;
+
+    float time;         
+    float windDirX;     
+    float windDirY;     
+    float windDirZ;     
+    float windScale;    
+    float windSpeed;   
+    float aeroDrag;
+    float windStrength;
 } push;
 
 struct Particle {
@@ -39,6 +48,14 @@ vec3 calculateSpringForce(vec3 pos, vec3 neighborPos, float restLength, float k)
         return k * (dist - restLength) * dir;
     }
     return vec3(0.0);
+}
+
+float calculateGust(vec3 pos, float scale, float speed, float time) {
+    float phase1 = dot(pos, vec3(scale, 0.0, scale)) - (time * speed);
+    float phase2 = dot(pos, vec3(-scale * 0.8, scale * 0.5, scale * 1.2)) - (time * speed * 1.3);
+    
+    float wave = (sin(phase1) + sin(phase2)) * 0.5; 
+    return max(0.0, wave); 
 }
 
 void main()
@@ -92,8 +109,6 @@ void main()
     if (gridX < (push.gridWidth - 1) && gridY < (push.gridHeight - 1)) 
         totalForce += calculateSpringForce(pos, particlesIn[i + push.gridWidth + 1].position_pinned.xyz, L_shear, k); //Bottom Right Neighbour
 
-    totalForce += vec3(0.0, -9.8, 0.0); 
-
     if (push.isMouseDown > 0.5) {
         vec3 mousePos = vec3(push.mouseX, push.mouseY, push.mouseZ);
         float d = distance(pos.xy, mousePos.xy);
@@ -113,6 +128,23 @@ void main()
             vel *= 0.5; 
         }
     }
+
+    vec3 p_right = (gridX < push.gridWidth - 1) ? particlesIn[i + 1].position_pinned.xyz : pos + vec3(push.rest_length, 0, 0);
+    vec3 p_down  = (gridY < push.gridHeight - 1) ? particlesIn[i + push.gridWidth].position_pinned.xyz : pos + vec3(0, -push.rest_length, 0);
+
+    vec3 tangentX = p_right - pos;
+    vec3 tangentY = p_down - pos;
+    
+    vec3 surfaceNormal = normalize(cross(tangentX, tangentY));
+
+    float windGust = calculateGust(pos, push.windScale, push.windSpeed, push.time);
+    vec3 baseWindDir = normalize(vec3(push.windDirX, push.windDirY, push.windDirZ));
+    vec3 windVelocity = baseWindDir * push.windStrength * (0.5 + windGust);
+
+    vec3 relVel = windVelocity - vel;
+    float windDotNormal = dot(surfaceNormal, relVel);
+    vec3 dragForce = surfaceNormal * (windDotNormal * push.aeroDrag);
+    totalForce += dragForce;
 
     // Integration
     // Now we add gravity and integrate ALL forces (including the new mouse force)

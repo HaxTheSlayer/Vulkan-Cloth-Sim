@@ -38,6 +38,14 @@ int main() {
 
         auto lastTime = std::chrono::high_resolution_clock::now();
 
+        float windDirX = 0.5f;     // Blowing slightly to the right
+        float windDirY = 0.0f;
+        float windDirZ = -1.0f;    // Blowing away from the camera
+        float windStrength = 15.0f;
+        float windSpeed = 5.0f;
+        float windScale = 0.2f;
+        float aeroDrag = 1.5f;
+
         while (!glfwWindowShouldClose(context.getWindow())) {
             glfwPollEvents();
 
@@ -64,6 +72,7 @@ int main() {
             // Normalize the coordinates to [-0.5, 0.5] and multiplies by a scalar to match the physical width/height of  camera view
             float screenWidth = 800.0f; 
             float screenHeight = 800.0f; 
+            float globalTime = static_cast<float>(glfwGetTime());
 
             float worldMouseX = ((float)mouseXpos / screenWidth - 0.5f) * 10.0f;
             float worldMouseY = -((float)mouseYpos / screenHeight - 0.5f) * 10.0f;
@@ -86,7 +95,8 @@ int main() {
             cmdBuffer.begin({});
 
             //Execute Physics (Compute Pass)
-            solver.dispatchCompute(cmdBuffer, deltaTime, worldMouseX, worldMouseY, worldMouseZ, isMouseDown);
+            solver.dispatchCompute(cmdBuffer, deltaTime, worldMouseX, worldMouseY, worldMouseZ, isMouseDown,
+                globalTime, windDirX, windDirY, windDirZ, windStrength, windSpeed, windScale, aeroDrag);
 
             // Prepare for Drawing (Image Transition)
             vk::ImageMemoryBarrier barrier2(

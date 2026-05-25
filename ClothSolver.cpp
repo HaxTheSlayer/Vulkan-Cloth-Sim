@@ -221,12 +221,31 @@ void ClothSolver::createComputePipeline() {
     computePipeline = vk::raii::Pipeline(vkContext.getDevice(), nullptr, pipelineInfo);
 }
 
-void ClothSolver::dispatchCompute(vk::raii::CommandBuffer& cmdBuffer, float deltaTime, float mouseX, float mouseY, float mouseZ, bool isMouseDown) {
+void ClothSolver::dispatchCompute(vk::raii::CommandBuffer& cmdBuffer, float deltaTime, float mouseX, float mouseY, float mouseZ, bool isMouseDown, float time, float windDirX, float windDirY, float windDirZ, float windStrength, float windSpeed, float windScale, float aeroDrag) {
 
     int subSteps = 10; // 10 physics steps per 1 visual frame
     float subDelta = deltaTime / static_cast<float>(subSteps);
 
-    PushConstants pushData{ subDelta, gridWidth, gridHeight, springStiffness, spacing, mouseX, mouseY, mouseZ, (isMouseDown ? 1.0f : 0.0f) };
+    PushConstants pushData{
+    subDelta,
+    gridWidth,
+    gridHeight,
+    springStiffness,
+    spacing,
+    mouseX,
+    mouseY,
+    mouseZ,
+    (isMouseDown ? 1.0f : 0.0f),
+
+    time,           
+    windDirX,
+    windDirY,
+    windDirZ,
+    windScale,
+    windSpeed,
+    aeroDrag,
+    windStrength
+    };
 
     cmdBuffer.bindPipeline(vk::PipelineBindPoint::eCompute, *computePipeline);
 
@@ -256,22 +275,22 @@ void ClothSolver::dispatchCompute(vk::raii::CommandBuffer& cmdBuffer, float delt
         // 2. Insert the Memory Barrier
         // The compute shader just wrote to the "Write" buffer (1 - currentFrame)
         vk::BufferMemoryBarrier bufferBarrier(
-            vk::AccessFlagBits::eShaderWrite,                                               // srcAccessMask: Compute shader writing
-            vk::AccessFlagBits::eShaderRead | vk::AccessFlagBits::eVertexAttributeRead,     // dstAccessMask: Vertex Input reading
-            vk::QueueFamilyIgnored,                                                         // srcQueueFamilyIndex
-            vk::QueueFamilyIgnored,                                                         // dstQueueFamilyIndex
-            *storageBuffers[1 - currentFrame],                                              // buffer (The one we just wrote to)
-            0,                                                                              // offset
-            VK_WHOLE_SIZE                                                                   // size
+            vk::AccessFlagBits::eShaderWrite,       // srcAccessMask: Compute shader writing
+            vk::AccessFlagBits::eShaderRead,       // dstAccessMask: Vertex Input reading
+            vk::QueueFamilyIgnored,                 // srcQueueFamilyIndex
+            vk::QueueFamilyIgnored,                 // dstQueueFamilyIndex
+            *storageBuffers[1 - currentFrame],      // buffer (The one we just wrote to)
+            0,                                      // offset
+            VK_WHOLE_SIZE                           // size
         );
 
         cmdBuffer.pipelineBarrier(
-            vk::PipelineStageFlagBits::eComputeShader,                                              // srcStageMask
-            vk::PipelineStageFlagBits::eComputeShader | vk::PipelineStageFlagBits::eVertexInput,    // dstStageMask
-            {},                                                                                     // dependencyFlags
-            nullptr,                                                                                // memoryBarriers
-            bufferBarrier,                                                                          // bufferMemoryBarriers
-            nullptr                                                                                 // imageMemoryBarriers
+            vk::PipelineStageFlagBits::eComputeShader,      // srcStageMask
+            vk::PipelineStageFlagBits::eComputeShader,      // dstStageMask
+            {},                                             // dependencyFlags
+            nullptr,                                        // memoryBarriers
+            bufferBarrier,                                  // bufferMemoryBarriers
+            nullptr                                         // imageMemoryBarriers
         );
 
         // Swap the frame index so the next pass reads the newly written data

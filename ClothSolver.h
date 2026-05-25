@@ -20,6 +20,15 @@ struct PushConstants {
     float mouseY;
     float mouseZ;
     float isMouseDown;
+
+    float time;         // Global accumulated time (for wave movement)
+    float windDirX;     
+    float windDirY;     
+    float windDirZ;     
+    float windStrength; 
+    float windSpeed;    
+    float windScale;    // Spatial frequency of the gusts
+    float aeroDrag;     
 };
 
 class ClothSolver {
@@ -27,7 +36,11 @@ public:
     ClothSolver(VulkanContext& context, uint32_t gridWidth, uint32_t gridHeight, float spacing, float springStiffness);
     ~ClothSolver() = default;
 
-    void dispatchCompute(vk::raii::CommandBuffer& cmdBuffer, float deltaTime, float mouseX, float mouseY, float mouseZ, bool isMouseDown);
+    void dispatchCompute(vk::raii::CommandBuffer& cmdBuffer, float deltaTime,
+        float mouseX, float mouseY, float mouseZ, bool isMouseDown,
+        float time, float windDirX, float windDirY, float windDirZ,
+        float windStrength, float windSpeed, float windScale, float aeroDrag
+    );
     uint32_t getCurrentFrame() const { return currentFrame; }
     uint32_t getGridWidth() const { return gridWidth; }
     uint32_t getGridHeight() const { return gridHeight; }
