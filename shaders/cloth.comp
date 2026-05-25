@@ -9,6 +9,10 @@ layout(push_constant) uniform PushConstants {
     uint gridHeight;
     float k;
     float rest_length;
+    float mouseX;
+    float mouseY;
+    float mouseZ;
+    float isMouseDown;
 } push;
 
 struct Particle {
@@ -90,31 +94,53 @@ void main()
 
     totalForce += vec3(0.0, -9.8, 0.0); 
 
-    // Apply forces to velocity (assuming mass = 1.0)
+    if (push.isMouseDown > 0.5) {
+        vec3 mousePos = vec3(push.mouseX, push.mouseY, push.mouseZ);
+        float d = distance(pos.xy, mousePos.xy);
+        
+        // Extremely tiny radius
+        float grabRadius = 0.15; 
+        
+        if (d > 0.0001 && d < grabRadius) { 
+            vec2 pullDir = normalize(mousePos.xy - pos.xy);
+
+            float grabStiffness = 150000.0; 
+            
+            // Standard Hooke's Law 
+            totalForce.xy += pullDir * (d * grabStiffness);
+            
+            // Heavy local damping. 
+            vel *= 0.5; 
+        }
+    }
+
+    // Integration
+    // Now we add gravity and integrate ALL forces (including the new mouse force)
+    totalForce += vec3(0.0, -9.8, 0.0); 
+    
     vel += totalForce * push.deltaTime;
-    vel *= 0.98; // Slight friction/damping to prevent explosive oscillation
+    vel *= 0.98; // General cloth air friction
     pos += vel * push.deltaTime;
 
+
+    // Ground Collision
     float floorHeight = -3.0;
     if (pos.y < floorHeight) {
-        pos.y = floorHeight; // Clamp to floor
-        
-        // Kill downward velocity and apply friction to X/Z movement
+        pos.y = floorHeight; 
         vel.y = 0.0;
         
-        // To avoid cloth from slipping on the ground when velocity is very small
-        if (abs(vel.x) < 0.05) {
+        // Grippy Industrial Friction to avoid cloth sliding on floor
+        if (abs(vel.x) < 0.5) {
             vel.x = 0.0;
         } else {
-            vel.x *= 0.8;
+            vel.x *= 0.5;
         }
         
-        if (abs(vel.z) < 0.05) {
+        if (abs(vel.z) < 0.5) {
             vel.z = 0.0;
         } else {
-            vel.z *= 0.8;
+            vel.z *= 0.5;
         }
-        
     }
 
     particlesOut[i].position_pinned = vec4(pos, pinned);

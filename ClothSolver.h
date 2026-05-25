@@ -15,6 +15,11 @@ struct PushConstants {
     uint32_t gridHeight;
     float k;
     float rest_length;
+
+    float mouseX;
+    float mouseY;
+    float mouseZ;
+    float isMouseDown;
 };
 
 class ClothSolver {
@@ -22,7 +27,7 @@ public:
     ClothSolver(VulkanContext& context, uint32_t gridWidth, uint32_t gridHeight, float spacing, float springStiffness);
     ~ClothSolver() = default;
 
-    void dispatchCompute(vk::raii::CommandBuffer& cmdBuffer, float deltaTime);
+    void dispatchCompute(vk::raii::CommandBuffer& cmdBuffer, float deltaTime, float mouseX, float mouseY, float mouseZ, bool isMouseDown);
     uint32_t getCurrentFrame() const { return currentFrame; }
     uint32_t getGridWidth() const { return gridWidth; }
     uint32_t getGridHeight() const { return gridHeight; }

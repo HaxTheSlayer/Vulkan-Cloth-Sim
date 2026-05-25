@@ -17,56 +17,11 @@ glm::vec3 cameraPos = glm::vec3(0.0f, 0.0f, 8.0f);
 glm::vec3 cameraFront = glm::vec3(0.0f, 0.0f, -1.0f);
 glm::vec3 cameraUp = glm::vec3(0.0f, 1.0f, 0.0f);
 
-bool firstMouse = true;
-float yaw = -90.0f;
-float pitch = -45.0f;
-float lastX = 800.0f / 2.0;
-float lastY = 800.0f / 2.0;
-
-void mouse_callback(GLFWwindow* window, double xposIn, double yposIn) {
-    float xpos = static_cast<float>(xposIn);
-    float ypos = static_cast<float>(yposIn);
-
-    if (firstMouse) {
-        lastX = xpos;
-        lastY = ypos;
-        firstMouse = false;
-    }
-
-    float xoffset = xpos - lastX;
-    float yoffset = lastY - ypos;
-    lastX = xpos;
-    lastY = ypos;
-
-    float sensitivity = 0.1f;
-    xoffset *= sensitivity;
-    yoffset *= sensitivity;
-
-    yaw += xoffset;
-    pitch += yoffset;
-
-    if (pitch > 89.0f)  pitch = 89.0f;
-    if (pitch < -89.0f) pitch = -89.0f;
-
-    // Convert Spherical coordinates to Cartesian vector
-    glm::vec3 front;
-    front.x = cos(glm::radians(yaw)) * cos(glm::radians(pitch));
-    front.y = sin(glm::radians(pitch));
-    front.z = sin(glm::radians(yaw)) * cos(glm::radians(pitch));
-    cameraFront = glm::normalize(front);
-}
-
-
 int main() {
     try {
         VulkanContext context(800, 800);
-        ClothSolver solver(context, 32, 32, 0.1f, 150.0f);
+        ClothSolver solver(context, 32, 32, 0.1f, 2000.0f);
         Renderer renderer(context, solver);
-
-        // Capture the mouse cursor
-        //glfwSetInputMode(context.getWindow(), GLFW_CURSOR, GLFW_CURSOR_DISABLED);
-        // Register the callback
-        //glfwSetCursorPosCallback(context.getWindow(), mouse_callback);
 
         vk::raii::Device& device = context.getDevice();
         vk::raii::Queue& queue = context.getQueue();
@@ -102,6 +57,22 @@ int main() {
             if (glfwGetKey(context.getWindow(), GLFW_KEY_D) == GLFW_PRESS)
                 cameraPos += glm::normalize(glm::cross(cameraFront, cameraUp)) * cameraSpeed;
 
+            double mouseXpos, mouseYpos;
+            glfwGetCursorPos(context.getWindow(), &mouseXpos, &mouseYpos);
+
+            // Map Screen Pixels to World Space
+            // Normalize the coordinates to [-0.5, 0.5] and multiplies by a scalar to match the physical width/height of  camera view
+            float screenWidth = 800.0f; 
+            float screenHeight = 800.0f; 
+
+            float worldMouseX = ((float)mouseXpos / screenWidth - 0.5f) * 10.0f;
+            float worldMouseY = -((float)mouseYpos / screenHeight - 0.5f) * 10.0f;
+            float worldMouseZ = 0.0f; // Assume we are grabbing the front plane of the cloth
+
+            // Checking click state
+            int state = glfwGetMouseButton(context.getWindow(), GLFW_MOUSE_BUTTON_LEFT);
+            bool isMouseDown = (state == GLFW_PRESS);
+
             //Wait for GPU & Acquire Next Image
             if (device.waitForFences({ *inFlightFence }, vk::True, UINT64_MAX) != vk::Result::eSuccess) {
                 throw std::runtime_error("failed to wait for fence!");
@@ -115,7 +86,7 @@ int main() {
             cmdBuffer.begin({});
 
             //Execute Physics (Compute Pass)
-            solver.dispatchCompute(cmdBuffer, deltaTime);
+            solver.dispatchCompute(cmdBuffer, deltaTime, worldMouseX, worldMouseY, worldMouseZ, isMouseDown);
 
             // Prepare for Drawing (Image Transition)
             vk::ImageMemoryBarrier barrier2(

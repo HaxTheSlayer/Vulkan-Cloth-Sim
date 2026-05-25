@@ -221,56 +221,62 @@ void ClothSolver::createComputePipeline() {
     computePipeline = vk::raii::Pipeline(vkContext.getDevice(), nullptr, pipelineInfo);
 }
 
-void ClothSolver::dispatchCompute(vk::raii::CommandBuffer& cmdBuffer, float deltaTime) {
+void ClothSolver::dispatchCompute(vk::raii::CommandBuffer& cmdBuffer, float deltaTime, float mouseX, float mouseY, float mouseZ, bool isMouseDown) {
 
-    PushConstants pushData{ deltaTime, gridWidth, gridHeight, springStiffness, spacing };
+    int subSteps = 10; // 10 physics steps per 1 visual frame
+    float subDelta = deltaTime / static_cast<float>(subSteps);
+
+    PushConstants pushData{ subDelta, gridWidth, gridHeight, springStiffness, spacing, mouseX, mouseY, mouseZ, (isMouseDown ? 1.0f : 0.0f) };
 
     cmdBuffer.bindPipeline(vk::PipelineBindPoint::eCompute, *computePipeline);
 
-    // Bind the descriptor set for the current frame
-    cmdBuffer.bindDescriptorSets(
-        vk::PipelineBindPoint::eCompute,
-        *computePipelineLayout,
-        0,
-        { *descriptorSets[currentFrame] },
-        nullptr
-    );
+    for (int i = 0; i < subSteps; i++)
+    {
+        // Bind the descriptor set for the current frame
+        cmdBuffer.bindDescriptorSets(
+            vk::PipelineBindPoint::eCompute,
+            *computePipelineLayout,
+            0,
+            { *descriptorSets[currentFrame] },
+            nullptr
+        );
 
-    // Push the 20 bytes of constant data
-    cmdBuffer.pushConstants<PushConstants>(
-        *computePipelineLayout,
-        vk::ShaderStageFlagBits::eCompute,
-        0,
-        pushData
-    );
+        // Push the constant data
+        cmdBuffer.pushConstants<PushConstants>(
+            *computePipelineLayout,
+            vk::ShaderStageFlagBits::eCompute,
+            0,
+            pushData
+        );
 
-    // Dispatch the compute workgroups
-    uint32_t groupCount = (particleCount + 255) / 256;
-    cmdBuffer.dispatch(groupCount, 1, 1);
+        // Dispatch the compute workgroups
+        uint32_t groupCount = (particleCount + 255) / 256;
+        cmdBuffer.dispatch(groupCount, 1, 1);
 
-    // 2. Insert the Memory Barrier
-    // The compute shader just wrote to the "Write" buffer (1 - currentFrame)
-    vk::BufferMemoryBarrier bufferBarrier(
-        vk::AccessFlagBits::eShaderWrite,         // srcAccessMask: Compute shader writing
-        vk::AccessFlagBits::eVertexAttributeRead, // dstAccessMask: Vertex Input reading
-        vk::QueueFamilyIgnored,                   // srcQueueFamilyIndex
-        vk::QueueFamilyIgnored,                   // dstQueueFamilyIndex
-        *storageBuffers[1 - currentFrame],        // buffer (The one we just wrote to)
-        0,                                        // offset
-        VK_WHOLE_SIZE                             // size
-    );
+        // 2. Insert the Memory Barrier
+        // The compute shader just wrote to the "Write" buffer (1 - currentFrame)
+        vk::BufferMemoryBarrier bufferBarrier(
+            vk::AccessFlagBits::eShaderWrite,                                               // srcAccessMask: Compute shader writing
+            vk::AccessFlagBits::eShaderRead | vk::AccessFlagBits::eVertexAttributeRead,     // dstAccessMask: Vertex Input reading
+            vk::QueueFamilyIgnored,                                                         // srcQueueFamilyIndex
+            vk::QueueFamilyIgnored,                                                         // dstQueueFamilyIndex
+            *storageBuffers[1 - currentFrame],                                              // buffer (The one we just wrote to)
+            0,                                                                              // offset
+            VK_WHOLE_SIZE                                                                   // size
+        );
 
-    cmdBuffer.pipelineBarrier(
-        vk::PipelineStageFlagBits::eComputeShader, // srcStageMask
-        vk::PipelineStageFlagBits::eVertexInput,   // dstStageMask
-        {},                                        // dependencyFlags
-        nullptr,                                   // memoryBarriers
-        bufferBarrier,                             // bufferMemoryBarriers
-        nullptr                                    // imageMemoryBarriers
-    );
+        cmdBuffer.pipelineBarrier(
+            vk::PipelineStageFlagBits::eComputeShader,                                              // srcStageMask
+            vk::PipelineStageFlagBits::eComputeShader | vk::PipelineStageFlagBits::eVertexInput,    // dstStageMask
+            {},                                                                                     // dependencyFlags
+            nullptr,                                                                                // memoryBarriers
+            bufferBarrier,                                                                          // bufferMemoryBarriers
+            nullptr                                                                                 // imageMemoryBarriers
+        );
 
-    // Swap the frame index so the next pass reads the newly written data
-    currentFrame = 1 - currentFrame;
+        // Swap the frame index so the next pass reads the newly written data
+        currentFrame = 1 - currentFrame;
+    }
 }
 
 std::vector<char> ClothSolver::readFile(const std::string& filename) {

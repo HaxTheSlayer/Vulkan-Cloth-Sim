@@ -59,8 +59,6 @@ VulkanContext::VulkanContext(uint32_t width, uint32_t height) {
 
 // Destructor implementation
 VulkanContext::~VulkanContext() {
-    // vk::raii handles most cleanup automatically in reverse order of creation!
-    // We only need to manually clean up the C-style GLFW pointers here.
     if (window) {
         glfwDestroyWindow(window);
     }
