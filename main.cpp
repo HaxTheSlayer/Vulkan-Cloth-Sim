@@ -38,10 +38,10 @@ int main() {
 
         auto lastTime = std::chrono::high_resolution_clock::now();
 
-        float windDirX = 0.5f;     // Blowing slightly to the right
+        float windDirX = 1.5f;     // Blowing slightly to the right
         float windDirY = 0.0f;
         float windDirZ = -1.0f;    // Blowing away from the camera
-        float windStrength = 15.0f;
+        float windStrength = 20.0f;
         float windSpeed = 5.0f;
         float windScale = 0.2f;
         float aeroDrag = 1.5f;
@@ -53,17 +53,17 @@ int main() {
             float deltaTime = std::chrono::duration<float, std::chrono::seconds::period>(currentTime - lastTime).count();
             lastTime = currentTime;
 
-            float cameraSpeed = 150.0f * deltaTime;
+            //float cameraSpeed = 15.0f * deltaTime;
 
-            // Keyboard polling
-            if (glfwGetKey(context.getWindow(), GLFW_KEY_W) == GLFW_PRESS)
-                cameraPos += cameraSpeed * cameraFront;
-            if (glfwGetKey(context.getWindow(), GLFW_KEY_S) == GLFW_PRESS)
-                cameraPos -= cameraSpeed * cameraFront;
-            if (glfwGetKey(context.getWindow(), GLFW_KEY_A) == GLFW_PRESS)
-                cameraPos -= glm::normalize(glm::cross(cameraFront, cameraUp)) * cameraSpeed;
-            if (glfwGetKey(context.getWindow(), GLFW_KEY_D) == GLFW_PRESS)
-                cameraPos += glm::normalize(glm::cross(cameraFront, cameraUp)) * cameraSpeed;
+            //// Keyboard polling
+            //if (glfwGetKey(context.getWindow(), GLFW_KEY_W) == GLFW_PRESS)
+            //    cameraPos += cameraSpeed * cameraFront;
+            //if (glfwGetKey(context.getWindow(), GLFW_KEY_S) == GLFW_PRESS)
+            //    cameraPos -= cameraSpeed * cameraFront;
+            //if (glfwGetKey(context.getWindow(), GLFW_KEY_A) == GLFW_PRESS)
+            //    cameraPos -= glm::normalize(glm::cross(cameraFront, cameraUp)) * cameraSpeed;
+            //if (glfwGetKey(context.getWindow(), GLFW_KEY_D) == GLFW_PRESS)
+            //    cameraPos += glm::normalize(glm::cross(cameraFront, cameraUp)) * cameraSpeed;
 
             double mouseXpos, mouseYpos;
             glfwGetCursorPos(context.getWindow(), &mouseXpos, &mouseYpos);

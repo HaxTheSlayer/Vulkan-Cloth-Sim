@@ -32,7 +32,7 @@ void Renderer::createGraphicsPipeline() {
         vk::VertexInputRate::eVertex        //inputRate
     };
 
-    std::array<vk::VertexInputAttributeDescription, 2> attributeDescriptions = {
+    std::array<vk::VertexInputAttributeDescription, 3> attributeDescriptions = {
         vk::VertexInputAttributeDescription{
             0,                                          //location
             0,                                          //binding
@@ -44,6 +44,12 @@ void Renderer::createGraphicsPipeline() {
             0,                                          //binding
             vk::Format::eR32G32B32A32Sfloat,            //format
             offsetof(ParticleData, velocity)            //offset
+        },
+        vk::VertexInputAttributeDescription{
+            2,                                          //location
+            0,                                          //binding
+            vk::Format::eR32G32B32A32Sfloat,            //format
+            offsetof(ParticleData, normal)              //offset
         }
     };
     vk::PipelineVertexInputStateCreateInfo   vertexInputInfo{
@@ -255,7 +261,9 @@ void Renderer::recordDrawCommands(vk::raii::CommandBuffer& cmdBuffer, uint32_t c
     cmdBuffer.setScissor(0, vk::Rect2D(vk::Offset2D(0, 0), swapChainExtent));
     cmdBuffer.bindPipeline(vk::PipelineBindPoint::eGraphics, *graphicsPipeline);
 
-    GraphicsPushConstants pushData{ cameraViewProj };
+    glm::mat4 modelMatrix = glm::mat4(1.0f);
+    GraphicsPushConstants pushData{ cameraViewProj, modelMatrix };
+
     cmdBuffer.pushConstants<GraphicsPushConstants>(
         *pipelineLayout,
         vk::ShaderStageFlagBits::eVertex,

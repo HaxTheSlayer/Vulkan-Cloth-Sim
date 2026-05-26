@@ -8,6 +8,7 @@
 // Push constant for the 3D camera
 struct GraphicsPushConstants {
     glm::mat4 mvp;
+    glm::mat4 model;
 };
 
 class Renderer {

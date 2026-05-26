@@ -7,6 +7,7 @@
 struct ParticleData {
     glm::vec4 position_pinned;
     glm::vec4 velocity;
+    glm::vec4 normal;
 };
 
 struct PushConstants {

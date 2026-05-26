@@ -26,7 +26,8 @@ layout(push_constant) uniform PushConstants {
 
 struct Particle {
     vec4 position_pinned; 
-    vec4 velocity;      
+    vec4 velocity;    
+    vec4 normal;  
 };
 
 // Binding 0: Read from Frame n
@@ -129,11 +130,13 @@ void main()
         }
     }
 
-    vec3 p_right = (gridX < push.gridWidth - 1) ? particlesIn[i + 1].position_pinned.xyz : pos + vec3(push.rest_length, 0, 0);
-    vec3 p_down  = (gridY < push.gridHeight - 1) ? particlesIn[i + push.gridWidth].position_pinned.xyz : pos + vec3(0, -push.rest_length, 0);
+    vec3 p_left  = (gridX > 0) ? particlesIn[i - 1].position_pinned.xyz : pos + vec3(-push.rest_length, 0.0, 0.0);
+    vec3 p_right = (gridX < push.gridWidth - 1) ? particlesIn[i + 1].position_pinned.xyz : pos + vec3(push.rest_length, 0.0, 0.0);
+    vec3 p_up    = (gridY > 0) ? particlesIn[i - push.gridWidth].position_pinned.xyz : pos + vec3(0.0, push.rest_length, 0.0);
+    vec3 p_down  = (gridY < push.gridHeight - 1) ? particlesIn[i + push.gridWidth].position_pinned.xyz : pos + vec3(0.0, -push.rest_length, 0.0);
 
-    vec3 tangentX = p_right - pos;
-    vec3 tangentY = p_down - pos;
+    vec3 tangentX = p_right - p_left;
+    vec3 tangentY = p_down - p_up;
     
     vec3 surfaceNormal = normalize(cross(tangentX, tangentY));
 
@@ -177,4 +180,5 @@ void main()
 
     particlesOut[i].position_pinned = vec4(pos, pinned);
     particlesOut[i].velocity = vec4(vel, 0.0);
+    particlesOut[i].normal = vec4(surfaceNormal, 0.0);
 }
